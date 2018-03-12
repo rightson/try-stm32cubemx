@@ -37,6 +37,7 @@
   */
 
 /* Includes ------------------------------------------------------------------*/
+#include <string.h>
 #include "main.h"
 #include "stm32f4xx_hal.h"
 
@@ -49,7 +50,11 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-
+#define MAX_BUF_SIZE 64
+char txBuffer[MAX_BUF_SIZE];
+char rxBuffer[MAX_BUF_SIZE];
+char rxCmdBuffer[MAX_BUF_SIZE];
+uint16_t rxCmdReadSize = -1;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -63,7 +68,22 @@ static void MX_USART2_UART_Init(void);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
-
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+	if (huart == &huart2) {
+		rxCmdBuffer[++rxCmdReadSize] = rxBuffer[0];
+		if (rxCmdReadSize == MAX_BUF_SIZE) {
+			rxCmdReadSize = -1; // circular buffer
+		}
+		if (strchr(rxCmdBuffer, ';') || rxBuffer[0] == ';') {
+			rxCmdBuffer[rxCmdReadSize] = '\n';
+			// do some action
+			HAL_UART_Transmit(&huart2, (uint8_t*)rxCmdBuffer, rxCmdReadSize, 0xffff);
+			memset(rxCmdBuffer, 0, rxCmdReadSize);
+			rxCmdReadSize = -1;
+		}
+		HAL_UART_Receive_IT(&huart2, (uint8_t*)rxBuffer, 1);
+	}
+}
 /* USER CODE END 0 */
 
 int main(void)
@@ -94,17 +114,19 @@ int main(void)
   MX_USART2_UART_Init();
 
   /* USER CODE BEGIN 2 */
-
+  sprintf(txBuffer, "Hello, world!\n\r");
+  HAL_UART_Transmit_IT(&huart2, (uint8_t*)txBuffer, strlen(txBuffer));
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  HAL_UART_Receive_IT(&huart2, (uint8_t*)rxBuffer, 1);
   while (1)
   {
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
-
+	  HAL_Delay(5000);
   }
   /* USER CODE END 3 */
 
